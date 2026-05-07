@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "displaydriver.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -37,22 +37,36 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 
+#define COUNTOF(__BUFFER__)   (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 
 COM_InitTypeDef BspCOMInit;
 
-#define D_I2C_ADDR = 0x3D
+I2C_HandleTypeDef hi2c1;
+
+/* USER CODE BEGIN PV */
+
+/* Size of Transmission buffer */
+#define TXBUFFERSIZE                      (COUNTOF(aTxBuffer) - 1)
+/* Size of Reception buffer */
+#define RXBUFFERSIZE                      TXBUFFERSIZE
+/* USER CODE END Private defines */
 
 I2C_HandleTypeDef hi2c1;
-/* USER CODE BEGIN PV */
+/* Buffer used for transmission */
+uint8_t aTxBuffer[] = " ****I2C_TwoBoards communication based on IT****  ****I2C_TwoBoards communication based on IT****  ****I2C_TwoBoards communication based on IT**** ";
+
+/* Buffer used for reception */
+uint8_t aRxBuffer[RXBUFFERSIZE];
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -91,6 +105,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -116,31 +131,34 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-  {
-	  reset_display();
-	  do
-	  {
-	    if (HAL_I2C_Master_Transmit_IT(&hi2c1, (uint16_t)D_I2C_ADDR, (uint8_t *)aTxBuffer, TXBUFFERSIZE) != HAL_OK)
-	    {
-	      /* Error_Handler() function is called when error occurs. */
-	      Error_Handler();
-	    }
+    {
+      dd_resetDisplay (&hi2c1);
+      do
+        {
+          //what to send? whole frame buffer?
+          if (HAL_I2C_Master_Transmit_IT (&hi2c1, (uint16_t)D_I2C_ADDR,
+                                          (uint8_t*) aTxBuffer, TXBUFFERSIZE)
+              != HAL_OK)
+            {
+              /* Error_Handler() function is called when error occurs. */
+              Error_Handler ();
+            }
 
-	    /*##- Wait for the end of the transfer #################################*/
-	    /*  Before starting a new communication transfer, you need to check the current
-	        state of the peripheral; if it's busy you need to wait for the end of current
-	        transfer before starting a new one.
-	        For simplicity reasons, this example is just waiting till the end of the
-	        transfer, but application may perform other tasks while transfer operation
-	        is ongoing. */
-	    while (HAL_I2C_GetState(&hi2c1) != HAL_I2C_STATE_READY)
-	    {
-	    }
+          /*##- Wait for the end of the transfer #################################*/
+          /*  Before starting a new communication transfer, you need to check the current
+           state of the peripheral; if it's busy you need to wait for the end of current
+           transfer before starting a new one.
+           For simplicity reasons, this example is just waiting till the end of the
+           transfer, but application may perform other tasks while transfer operation
+           is ongoing. */
+          while (HAL_I2C_GetState (&hi2c1) != HAL_I2C_STATE_READY)
+            {
+            }
 
-	    /* When Acknowledge failure occurs (Slave don't acknowledge it's address)
-	       Master restarts communication */
-	  }
-	  while (HAL_I2C_GetError(&hi2c1) == HAL_I2C_ERROR_AF);
+          /* When Acknowledge failure occurs (Slave don't acknowledge it's address)
+           Master restarts communication */
+        }
+      while (HAL_I2C_GetError (&hi2c1) == HAL_I2C_ERROR_AF);
 
     /* USER CODE END WHILE */
 
@@ -188,6 +206,54 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x00402D41;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -202,6 +268,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
